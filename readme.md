@@ -1,0 +1,1 @@
+# SourceMod Paint Plugin
