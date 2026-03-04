@@ -175,18 +175,18 @@ public Action Timer_SendDecals(Handle timer, int client) {
         return Plugin_Stop;
     }
 
-    // Always send shared buffer first
-    int start = (g_iDecalCount < MAX_DECALS) ? 0 : g_iDecalHead;
-
-    for (int i = 0; i < g_iDecalCount; i++) {
-        int idx = (start + i) % MAX_DECALS;
-        TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-        TE_SendToClient(client);
-    }
-
-    // If client-side mode is on, auto-load their saved decals from DB
     if (g_bClientSidePaint[client]) {
+        // Client-side mode: skip shared buffer, load their own decals from DB
         FetchClientDecals(client);
+    } else {
+        // Shared mode: send the server buffer
+        int start = (g_iDecalCount < MAX_DECALS) ? 0 : g_iDecalHead;
+
+        for (int i = 0; i < g_iDecalCount; i++) {
+            int idx = (start + i) % MAX_DECALS;
+            TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
+            TE_SendToClient(client);
+        }
     }
 
     return Plugin_Stop;
@@ -499,25 +499,12 @@ void EraseDecal(int client, int idx) {
         g_iDecalHead = (g_iDecalCount < MAX_DECALS) ? g_iDecalCount : lastIdx;
 
         for (int i = 1; i <= MaxClients; i++) {
-            if (IsClientInGame(i)) {
+            if (IsClientInGame(i) && !g_bClientSidePaint[i]) {
                 ClientCommand(i, "r_cleardecals");
             }
         }
 
         RepaintSharedToAll();
-
-        // Also replay each client's own client-side decals back to them
-        for (int i = 1; i <= MaxClients; i++) {
-            if (IsClientInGame(i) && g_iClientDecalCount[i] > 0) {
-                int start = (g_iClientDecalCount[i] < MAX_DECALS) ? 0 : g_iClientDecalHead[i];
-
-                for (int j = 0; j < g_iClientDecalCount[i]; j++) {
-                    int decalIdx = (start + j) % MAX_DECALS;
-                    TE_SetupWorldDecal(g_fClientDecalPos[i][decalIdx], g_iClientDecalSprite[i][decalIdx]);
-                    TE_SendToClient(i);
-                }
-            }
-        }
     }
 
     for (int i = 1; i <= MaxClients; i++) {
@@ -540,23 +527,10 @@ void EraseAll(int client) {
         g_iDecalHead  = 0;
 
         for (int i = 1; i <= MaxClients; i++) {
-            if (IsClientInGame(i)) {
-                ClientCommand(i, "r_cleardecals");
-            }
-
             g_iHoveredDecal[i] = -1;
-        }
 
-        // Replay each client's own client-side decals back to them
-        for (int i = 1; i <= MaxClients; i++) {
-            if (IsClientInGame(i) && g_iClientDecalCount[i] > 0) {
-                int start = (g_iClientDecalCount[i] < MAX_DECALS) ? 0 : g_iClientDecalHead[i];
-
-                for (int j = 0; j < g_iClientDecalCount[i]; j++) {
-                    int idx = (start + j) % MAX_DECALS;
-                    TE_SetupWorldDecal(g_fClientDecalPos[i][idx], g_iClientDecalSprite[i][idx]);
-                    TE_SendToClient(i);
-                }
+            if (IsClientInGame(i) && !g_bClientSidePaint[i]) {
+                ClientCommand(i, "r_cleardecals");
             }
         }
     }
@@ -592,7 +566,12 @@ void AddPaint(int client, float pos[3], int paint = 0, int size = 0) {
         }
 
         TE_SetupWorldDecal(pos, sprite);
-        TE_SendToAll();
+
+        for (int i = 1; i <= MaxClients; i++) {
+            if (IsClientInGame(i) && !g_bClientSidePaint[i]) {
+                TE_SendToClient(i);
+            }
+        }
     }
 
     for (int i = 1; i <= MaxClients; i++) {
@@ -608,7 +587,12 @@ void RepaintSharedToAll() {
     for (int i = 0; i < g_iDecalCount; i++) {
         int idx = (start + i) % MAX_DECALS;
         TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-        TE_SendToAll();
+
+        for (int j = 1; j <= MaxClients; j++) {
+            if (IsClientInGame(j) && !g_bClientSidePaint[j]) {
+                TE_SendToClient(j);
+            }
+        }
     }
 }
 
