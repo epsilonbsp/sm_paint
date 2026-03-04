@@ -104,7 +104,6 @@ public void OnPluginStart() {
     ConnectDB();
 
     RegConsoleCmd("sm_paint",           cmd_PaintMenu);
-    RegConsoleCmd("sm_paintcolour",     cmd_PaintColor);
     RegConsoleCmd("sm_paintcolor",      cmd_PaintColor);
     RegConsoleCmd("sm_paintsize",       cmd_PaintSize);
     RegConsoleCmd("sm_clientsidepaint", cmd_ToggleClientSide);
