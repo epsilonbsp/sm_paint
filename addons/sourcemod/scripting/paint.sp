@@ -482,9 +482,9 @@ void EraseDecal(int client, int idx) {
         g_iClientDecalHead[client] = (g_iClientDecalCount[client] < MAX_DECALS) ?
             g_iClientDecalCount[client] : lastIdx;
 
-        // Clear and replay both shared + client-side decals for this client only
+        // Clear and replay this client's own decals only
         ClientCommand(client, "r_cleardecals");
-        SendAllDecalsToClient(client);
+        SendActiveDecalsToClient(client);
     } else {
         int lastIdx = (g_iDecalCount < MAX_DECALS) ?
             g_iDecalCount - 1 :
@@ -521,7 +521,6 @@ void EraseAll(int client) {
         g_iHoveredDecal[client]     = -1;
 
         ClientCommand(client, "r_cleardecals");
-        SendAllDecalsToClient(client); // Replay shared buffer so they still see others' paint
     } else {
         g_iDecalCount = 0;
         g_iDecalHead  = 0;
@@ -565,12 +564,18 @@ void AddPaint(int client, float pos[3], int paint = 0, int size = 0) {
             g_iDecalCount++;
         }
 
-        TE_SetupWorldDecal(pos, sprite);
+        int clients[MAX_PAINT_PLAYERS];
+        int numClients = 0;
 
         for (int i = 1; i <= MaxClients; i++) {
-            if (IsClientInGame(i) && !g_bClientSidePaint[i]) {
-                TE_SendToClient(i);
+            if (IsClientInGame(i) && !IsFakeClient(i) && !g_bClientSidePaint[i]) {
+                clients[numClients++] = i;
             }
+        }
+
+        if (numClients > 0) {
+            TE_SetupWorldDecal(pos, sprite);
+            TE_Send(clients, numClients);
         }
     }
 
@@ -582,17 +587,25 @@ void AddPaint(int client, float pos[3], int paint = 0, int size = 0) {
 }
 
 void RepaintSharedToAll() {
+    int clients[MAX_PAINT_PLAYERS];
+    int numClients = 0;
+
+    for (int j = 1; j <= MaxClients; j++) {
+        if (IsClientInGame(j) && !IsFakeClient(j) && !g_bClientSidePaint[j]) {
+            clients[numClients++] = j;
+        }
+    }
+
+    if (numClients == 0) {
+        return;
+    }
+
     int start = (g_iDecalCount < MAX_DECALS) ? 0 : g_iDecalHead;
 
     for (int i = 0; i < g_iDecalCount; i++) {
         int idx = (start + i) % MAX_DECALS;
         TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-
-        for (int j = 1; j <= MaxClients; j++) {
-            if (IsClientInGame(j) && !g_bClientSidePaint[j]) {
-                TE_SendToClient(j);
-            }
-        }
+        TE_Send(clients, numClients);
     }
 }
 
@@ -614,31 +627,6 @@ void SendActiveDecalsToClient(int client) {
             int idx = (start + i) % MAX_DECALS;
 
             TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-            TE_SendToClient(client);
-        }
-    }
-}
-
-// Sends shared buffer + client's own buffer (used for late-join replay and erase repaint).
-void SendAllDecalsToClient(int client) {
-    // Shared buffer
-    int start = (g_iDecalCount < MAX_DECALS) ? 0 : g_iDecalHead;
-
-    for (int i = 0; i < g_iDecalCount; i++) {
-        int idx = (start + i) % MAX_DECALS;
-
-        TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-        TE_SendToClient(client);
-    }
-
-    // Client's own buffer
-    if (g_iClientDecalCount[client] > 0) {
-        start = (g_iClientDecalCount[client] < MAX_DECALS) ? 0 : g_iClientDecalHead[client];
-
-        for (int i = 0; i < g_iClientDecalCount[client]; i++) {
-            int idx = (start + i) % MAX_DECALS;
-
-            TE_SetupWorldDecal(g_fClientDecalPos[client][idx], g_iClientDecalSprite[client][idx]);
             TE_SendToClient(client);
         }
     }
@@ -713,14 +701,6 @@ public void LoadConfirmMenuHandle(Menu menu, MenuAction action, int param1, int 
 
         if (StrEqual(info, "yes")) {
             ClientCommand(param1, "r_cleardecals");
-            int start = (g_iDecalCount < MAX_DECALS) ? 0 : g_iDecalHead;
-
-            for (int i = 0; i < g_iDecalCount; i++) {
-                int idx = (start + i) % MAX_DECALS;
-                TE_SetupWorldDecal(g_fDecalPos[idx], g_iDecalSprite[idx]);
-                TE_SendToClient(param1);
-            }
-
             FetchClientDecals(param1); // async; DB_OnFetchDecals will reopen paint menu when done
         } else {
             OpenPaintMenu(param1);
