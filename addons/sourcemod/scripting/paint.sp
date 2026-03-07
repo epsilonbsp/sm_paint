@@ -88,6 +88,14 @@ char g_cPaintSizes[][][64] = {
     {"Very Large", "_4"}
 };
 
+float g_cPaintScales[] = {
+    0.0625,
+    0.125,
+    0.25,
+    0.5,
+    1.0
+};
+
 int g_Sprites[sizeof(g_cPaintColors) - 1][sizeof(g_cPaintSizes)];
 
 public void OnPluginStart() {
@@ -412,7 +420,14 @@ public void Timer_Paint(Handle timer) {
                     glowPos = g_fDecalPos[nearest];
                 }
 
-                TE_SetupGlowSprite(glowPos, g_iGlowSprite, 0.15, 3.0, 150);
+                int sizeIndex = g_iClientDecalSize[i][nearest];
+                float scale = 1.0;
+
+                if (sizeIndex > -1 && sizeIndex < 5) {
+                    scale = g_cPaintScales[sizeIndex] * 3.0;
+                }
+
+                TE_SetupGlowSprite(glowPos, g_iGlowSprite, 0.15, scale, 150);
                 TE_SendToClient(i);
             }
         }
