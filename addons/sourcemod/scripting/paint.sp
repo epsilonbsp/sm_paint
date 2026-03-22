@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 EpsilonBSP
+// Copyright (C) 2026 epsilonbsp
 
 #pragma semicolon 1
 
@@ -16,7 +16,7 @@
 
 public Plugin myinfo = {
     name =        "Paint",
-    author =      "EpsilonBSP",
+    author =      "epsilonbsp",
     description = "Make it possible for players to paint on walls",
     version =     PLUGIN_VERSION,
     url =         "https://github.com/epsilonbsp/sm_paint"
